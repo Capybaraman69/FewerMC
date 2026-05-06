@@ -1,0 +1,18 @@
+name: FewerMCLink
+version: 1.0.0
+main: link.fewermc.FewerMCLinkPlugin
+api-version: '1.21'
+author: FewerMC Team
+description: Official FewerMC Discord moderation bridge with role-based punishment limits.
+
+commands:
+  fewermclink:
+    description: Main admin command for FewerMCLink.
+    usage: /fewermclink reload
+    aliases: [fmlink]
+    permission: fewermclink.admin
+
+permissions:
+  fewermclink.admin:
+    description: Allows reloading FewerMCLink.
+    default: op

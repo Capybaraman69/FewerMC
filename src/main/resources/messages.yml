@@ -1,0 +1,85 @@
+ingame:
+  prefix: "&a&lFEWER &7"
+  no-permission: "&cYou do not have permission to use FewerMCLink."
+  usage: "&eUsage: /fewermclink reload"
+  reload-success: "&aFewerMCLink reloaded. Discord moderation commands refreshed."
+  discord-disabled: "&cDiscord moderation bridge is disabled. Add a bot token in config.yml"
+
+discord:
+  member-required: "This action must be used inside a Discord server channel."
+  no-permission: "You do not have permission to run this moderation action."
+  missing-user: "Missing target. Please provide a valid Minecraft username."
+  invalid-user: "Invalid username `{user}`. Allowed: 1-16 characters (letters, numbers, underscore)."
+  missing-reason: "Missing reason. Please provide a clear moderation reason."
+  invalid-time: "Invalid duration format. Use one value ending in s, m, h, or d (examples: 30s, 30m, 12h, 7d)."
+  max-time-exceeded: "Duration exceeds your limit. Maximum allowed: {max_human}."
+  missing-template: "Moderation template missing for {command}. Configure it in config.yml."
+  command-success: |-
+    Punishment Applied
+    Action: /{command}
+    Player: {user}
+    Staff: {executor}
+  ban-success: |-
+    Punishment Applied
+    Action: Ban
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: Permanent
+  ipban-success: |-
+    Punishment Applied
+    Action: IP Ban
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: Permanent
+  mute-success: |-
+    Punishment Applied
+    Action: Mute
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: Permanent
+  ipmute-success: |-
+    Punishment Applied
+    Action: IP Mute
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: Permanent
+  tempban-success: |-
+    Punishment Applied
+    Action: Temp Ban
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: {time_human}
+  tempmute-success: |-
+    Punishment Applied
+    Action: Temp Mute
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+    Duration: {time_human}
+  unban-success: |-
+    Punishment Applied
+    Action: Unban
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+  unmute-success: |-
+    Punishment Applied
+    Action: Unmute
+    Player: {user}
+    Staff: {executor}
+    Reason: {reason}
+  command-failed: |-
+    Punishment Failed
+    Action: /{command}
+    Player: {user}
+    Staff: {executor}
+  history-header: "Moderation history for {user} ({count} entries)"
+  history-none: "No moderation history found for {user}."
+  bot-started: "FewerMCLink connected successfully. Moderation bridge is now online."
+  bot-stopped: "FewerMCLink disconnected. Moderation bridge is offline."
+  bridge-reloaded: "Moderation bridge reloaded successfully."

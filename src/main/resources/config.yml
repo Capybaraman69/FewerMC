@@ -1,0 +1,53 @@
+discord:
+  token: "PUT_BOT_TOKEN_HERE"
+  guild-id: ""
+  status: "watching"
+  activity-text: "FewerMC staff actions"
+
+roles:
+  # Use star: "(ROLE_ID)*" for your top rank role.
+  # Example: star: "(1231231231231231231)*"
+  # The configured star role gets full access to all commands.
+  # Add the Discord role IDs below.
+  star: ""
+  admin: ""
+  manager: ""
+  srmod: ""
+  mod: ""
+  jrmod: ""
+  srhelper: ""
+  helper: ""
+  trainee: ""
+
+# Any member with one of these role IDs is blocked from using bridge commands.
+# You can list multiple IDs in one value separated by commas.
+# Example: blacklist: "1231231231231231231,1231231231231231231,1231231231231231231"
+disallowed-roles:
+  blacklist: ""
+
+commands:
+  ban: "ban {player} {reason}"
+  mute: "mute {player} {reason}"
+  ipban: "ipban {player} {reason}"
+  ipmute: "ipmute {player} {reason}"
+  tempban: "tempban {player} {time} {reason}"
+  tempmute: "tempmute {player} {time} {reason}"
+  unban: "unban {player} {reason}"
+  unmute: "unmute {player} {reason}"
+
+logging:
+  log-discord-actions: true
+  # Leave blank to disable Discord audit log messages.
+  channel-id: ""
+
+# Maximum temporary punishment durations per rank.
+# Key names are matched to roles by name (srmod, sr.mod, sr_mod are treated the same).
+# Format: <number><unit> using s (seconds), h (hours), or d (days)
+# Limits are optional and only apply when explicitly set.
+# You can also set limits for star/admin/manager if you want those roles capped.
+# Use "unlimited" or leave blank for no cap.
+limits:
+  srmod: "30d"
+  mod: "7d"
+  jrmod: "1d"
+  srhelper: "1h"
