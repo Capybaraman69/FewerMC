@@ -18,7 +18,7 @@ import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.awt.Color;
@@ -34,9 +34,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public final class DiscordBotManager extends ListenerAdapter {
+    private final AtomicBoolean starting = new AtomicBoolean(false);
 
     private static final DateTimeFormatter HISTORY_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
             .withZone(ZoneOffset.UTC);
@@ -49,18 +51,22 @@ public final class DiscordBotManager extends ListenerAdapter {
     private final Object historyLock = new Object();
     private final File historyFile;
     private volatile JDA jda;
-    private YamlConfiguration historyData;
 
     public DiscordBotManager(FewerMCLinkPlugin plugin) {
         this.plugin = plugin;
-        this.historyFile = new File(plugin.getDataFolder(), "history.yml");
-        loadHistoryData();
+        this.historyFile = new File(plugin.getDataFolder(), "history.log");
+
     }
 
     public void start() {
+        if (!starting.compareAndSet(false, true)) {
+            plugin.getLogger().warning("DiscordBotManager start() called while already starting/reloading.");
+            return;
+        }
         String token = plugin.getConfig().getString("discord.token", "").trim();
         if (token.isEmpty() || token.equalsIgnoreCase("PUT_BOT_TOKEN_HERE")) {
             plugin.getLogger().warning("Discord token not configured. Bridge disabled until config is updated.");
+            starting.set(false);
             return;
         }
 
@@ -78,16 +84,22 @@ public final class DiscordBotManager extends ListenerAdapter {
             } catch (Exception ex) {
                 plugin.getLogger().severe("Failed to start Discord bridge: " + ex.getMessage());
                 ex.printStackTrace();
+            } finally {
+                starting.set(false);
             }
         });
     }
 
     public void shutdown() {
         if (jda != null) {
-            jda.shutdownNow();
+            try {
+                jda.shutdownNow();
+            } catch (Exception ignored) {}
             jda = null;
             plugin.getLogger().info(plugin.rawDiscordMsg("discord.bot-stopped"));
         }
+        // Reset flag in case shutdown is called during reload
+        starting.set(false);
     }
 
     public void reload() {
@@ -262,7 +274,8 @@ public final class DiscordBotManager extends ListenerAdapter {
                     "discord.invalid-user",
                     "Invalid Minecraft username. Use 1-16 characters: letters, numbers, underscore only."
             ).replace("{user}", player);
-                event.replyEmbeds(responseEmbed(invalidUser, new Color(0xF1C40F)).build()).queue();
+                event.replyEmbeds(responseEmbed(invalidUser, new Color(0xF1C40F)).build())
+                    .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
             return;
         }
 
@@ -282,7 +295,8 @@ public final class DiscordBotManager extends ListenerAdapter {
                         .replace("{max_human}", maxHuman)
                         .replace("{input}", time)
                         .replace("{input_human}", inputHuman);
-                event.replyEmbeds(responseEmbed(msg, new Color(0xF1C40F)).build()).queue();
+                event.replyEmbeds(responseEmbed(msg, new Color(0xF1C40F)).build())
+                    .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
                 return;
             }
         }
@@ -323,7 +337,8 @@ public final class DiscordBotManager extends ListenerAdapter {
                         .replace("{time_human}", formatDurationForDisplay(time))
                         .replace("{executor}", actorName)
                         .replace("{moderator}", actorName);
-                    hook.editOriginalEmbeds(responseEmbed(fail, new Color(0xC0392B)).build()).queue();
+                    hook.editOriginalEmbeds(responseEmbed(fail, new Color(0xC0392B)).build())
+                        .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
                     return;
                 }
             } catch (Exception ex) {
@@ -340,11 +355,13 @@ public final class DiscordBotManager extends ListenerAdapter {
                     .replace("{time_human}", formatDurationForDisplay(time))
                     .replace("{executor}", actorName)
                     .replace("{moderator}", actorName);
-                hook.editOriginalEmbeds(responseEmbed(fail, new Color(0xC0392B)).build()).queue();
+                hook.editOriginalEmbeds(responseEmbed(fail, new Color(0xC0392B)).build())
+                    .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
                 return;
             }
 
-            hook.editOriginalEmbeds(commandSuccessEmbed(command, actorName, player, reason, time, finalCommand).build()).queue();
+            hook.editOriginalEmbeds(commandSuccessEmbed(command, actorName, player, reason, time, finalCommand).build())
+                .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
             recordHistory(event.getUser(), actorName, command, player, time, reason, finalCommand, "SUCCESS");
             sendLogMessage(event.getUser().getId(), actorName, command, player, time, reason, finalCommand, "SUCCESS");
 
@@ -354,19 +371,6 @@ public final class DiscordBotManager extends ListenerAdapter {
         }));
     }
 
-    private String successMessagePath(Action action) {
-        return switch (action) {
-            case BAN -> "discord.ban-success";
-            case IP_BAN -> "discord.ipban-success";
-            case MUTE -> "discord.mute-success";
-            case IP_MUTE -> "discord.ipmute-success";
-            case TEMP_BAN -> "discord.tempban-success";
-            case TEMP_MUTE -> "discord.tempmute-success";
-            case UNBAN -> "discord.unban-success";
-            case UNMUTE -> "discord.unmute-success";
-            default -> "discord.command-success";
-        };
-    }
 
     private EmbedBuilder commandSuccessEmbed(String command, String actorName, String player, String reason, String time,
                                              String finalCommand) {
@@ -407,7 +411,8 @@ public final class DiscordBotManager extends ListenerAdapter {
     }
 
     private void replyPublic(SlashCommandInteractionEvent event, String path, String fallback, Color color) {
-        event.replyEmbeds(responseEmbed(discordMsg(path, fallback), color).build()).queue();
+        event.replyEmbeds(responseEmbed(discordMsg(path, fallback), color).build())
+            .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
     }
 
     private String discordMsg(String path, String fallback) {
@@ -430,7 +435,8 @@ public final class DiscordBotManager extends ListenerAdapter {
         if (historyEntries.isEmpty()) {
             String none = plugin.rawDiscordMsg("discord.history-none")
                     .replace("{user}", targetName);
-            event.replyEmbeds(responseEmbed(none, new Color(0x9B59B6)).build()).queue();
+            event.replyEmbeds(responseEmbed(none, new Color(0x9B59B6)).build())
+                .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
             return;
         }
 
@@ -440,9 +446,11 @@ public final class DiscordBotManager extends ListenerAdapter {
 
         event.deferReply().queue(hook -> {
             List<String> chunks = chunkHistory(header, historyEntries);
-            hook.editOriginalEmbeds(responseEmbed(chunks.get(0), new Color(0x9B59B6)).build()).queue();
+            hook.editOriginalEmbeds(responseEmbed(chunks.get(0), new Color(0x9B59B6)).build())
+                .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
             for (int index = 1; index < chunks.size(); index++) {
-                hook.sendMessageEmbeds(responseEmbed(chunks.get(index), new Color(0x9B59B6)).build()).queue();
+                hook.sendMessageEmbeds(responseEmbed(chunks.get(index), new Color(0x9B59B6)).build())
+                    .queue(null, err -> plugin.getLogger().warning("Failed to send Discord reply: " + err.getMessage()));
             }
 
             String actorName = event.getMember().getEffectiveName();
@@ -473,25 +481,35 @@ public final class DiscordBotManager extends ListenerAdapter {
     private void recordHistory(User user, String actorName, String command, String player, String time, String reason,
                                String finalCommand, String status) {
         String timestamp = HISTORY_TIME_FORMAT.format(Instant.now());
-        String entry = "- [" + timestamp + "] " + status + " /" + command + " by " + actorName
+        String entry = user.getId() + " | [" + timestamp + "] " + status + " /" + command + " by " + actorName
                 + (player.isBlank() ? "" : " target=" + player)
                 + (time.isBlank() ? "" : " time=" + time)
                 + (reason.isBlank() ? "" : " reason=" + reason)
                 + (finalCommand.isBlank() ? "" : " | console=" + finalCommand);
-
         synchronized (historyLock) {
-            String basePath = "users." + user.getId();
-            historyData.set(basePath + ".name", actorName);
-            List<String> entries = new ArrayList<>(historyData.getStringList(basePath + ".entries"));
-            entries.add(entry);
-            historyData.set(basePath + ".entries", entries);
-            saveHistoryData();
+            try (java.io.FileWriter fw = new java.io.FileWriter(historyFile, true)) {
+                fw.write(entry + System.lineSeparator());
+            } catch (java.io.IOException ex) {
+                plugin.getLogger().warning("Could not append to history.log: " + ex.getMessage());
+            }
         }
     }
 
     private List<String> getHistoryEntries(String userId) {
         synchronized (historyLock) {
-            return new ArrayList<>(historyData.getStringList("users." + userId + ".entries"));
+            if (!historyFile.exists()) return List.of();
+            List<String> result = new ArrayList<>();
+            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(historyFile))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (line.startsWith(userId + " | ")) {
+                        result.add(line.substring(line.indexOf("| ") + 2));
+                    }
+                }
+            } catch (java.io.IOException ex) {
+                plugin.getLogger().warning("Could not read history.log: " + ex.getMessage());
+            }
+            return result;
         }
     }
 
@@ -540,30 +558,8 @@ public final class DiscordBotManager extends ListenerAdapter {
         );
     }
 
-    private void loadHistoryData() {
-        synchronized (historyLock) {
-            if (!historyFile.exists()) {
-                try {
-                    File parent = historyFile.getParentFile();
-                    if (parent != null && !parent.exists()) {
-                        parent.mkdirs();
-                    }
-                    historyFile.createNewFile();
-                } catch (IOException ex) {
-                    plugin.getLogger().warning("Could not create history.yml: " + ex.getMessage());
-                }
-            }
-            historyData = YamlConfiguration.loadConfiguration(historyFile);
-        }
-    }
-
-    private void saveHistoryData() {
-        try {
-            historyData.save(historyFile);
-        } catch (IOException ex) {
-            plugin.getLogger().warning("Could not save history.yml: " + ex.getMessage());
-        }
-    }
+    private void loadHistoryData() {}
+    private void saveHistoryData() {}
 
     private Duration readLimit(String roleKey) {
         String raw = readSectionValueByKey("limits", roleKey);
@@ -681,10 +677,9 @@ public final class DiscordBotManager extends ListenerAdapter {
     }
 
     private static String sanitize(String input) {
-        if (input == null) {
-            return "";
-        }
-        return input.replaceAll("[\\p{Cntrl}]", "").trim();
+        if (input == null) return "";
+        // Remove control chars, shell metachars, and Discord mentions
+        return input.replaceAll("[\n\r;|&$`><\\\"'@]", "").replaceAll("[\\p{Cntrl}]", "").trim();
     }
 
     private String formatDurationForDisplay(String rawDuration) {

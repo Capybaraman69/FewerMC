@@ -1,4 +1,4 @@
-discord:
+﻿discord:
   token: "PUT_BOT_TOKEN_HERE"
   guild-id: ""
   status: "watching"
